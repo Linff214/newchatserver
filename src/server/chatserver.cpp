@@ -52,11 +52,29 @@ void ChatServer::onMessage(const TcpConnectionPtr &conn,
     // 测试，添加json打印代码
     cout << buf << endl;
 
-    // 数据的反序列化
-    json js = json::parse(buf); //假设 buf 的内容如下：{"msgid": 1, "username": "Alice", "password": "123456"}
+    // 数据的反序列化//假设 buf 的内容如下：{"msgid": 1, "username": "Alice", "password": "123456"}
     // 达到的目的：完全解耦网络模块的代码和业务模块的代码
     // 通过js["msgid"] 获取=》业务handler=》conn  js  time
-    auto msgHandler = ChatService::instance()->getHandler(js["msgid"].get<int>());
+    try
+    {
+        json js = json::parse(buf);  // 🛡️ 有效防止非法 json 导致崩溃
+
+        // 正常交由 ChatService 处理消息
+        auto msgHandler = ChatService::instance()->getHandler(js["msgid"].get<int>());
+        msgHandler(conn, js, time);
+    }
+    catch (json::parse_error& e)
+    {
+        std::cerr << "JSON parse error: " << e.what() << "\n";
+
+        json response;
+        response["msgid"] = -1;
+        response["errno"] = 400;
+        response["errmsg"] = "Invalid JSON format, parse failed.";
+
+        conn->send(response.dump()); // 返回错误给客户端
+    } 
+    //auto msgHandler = ChatService::instance()->getHandler(js["msgid"].get<int>());
     // 回调消息绑定好的事件处理器，来执行相应的业务处理
-    msgHandler(conn, js, time);
+    //msgHandler(conn, js, time);
 }

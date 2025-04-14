@@ -21,10 +21,10 @@ public:
 
     // 向redis指定的通道channel发布消息
     bool publish(int channel, string message);
-
+    bool publish(std::string channel, std::string message); 
     // 向redis指定的通道subscribe订阅消息
     bool subscribe(int channel);
-
+    bool subscribe(const string &channel);// 订阅字符串类型的频道
     // 向redis指定的通道unsubscribe取消订阅消息
     bool unsubscribe(int channel);
 

@@ -8,8 +8,8 @@ bool UserModel::insert(User &user)
 {
     // 1.组装sql语句
     char sql[1024] = {0};
-    sprintf(sql, "insert into user(name, password, state) values('%s', '%s', '%s')",
-            user.getName().c_str(), user.getPwd().c_str(), user.getState().c_str());
+    sprintf(sql, "insert into user(name, password, state, role) values('%s', '%s', '%s','%s')",
+            user.getName().c_str(), user.getPwd().c_str(), user.getState().c_str(),user.getRole().c_str());
 
     MySQL mysql;
     if (mysql.connect())
@@ -46,6 +46,7 @@ User UserModel::query(int id)
                 user.setName(row[1]);
                 user.setPwd(row[2]);
                 user.setState(row[3]);
+                user.setRole(row[4]);  //  加这一行
                 mysql_free_result(res);
                 return user;
             }

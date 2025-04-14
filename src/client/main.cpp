@@ -1,15 +1,20 @@
 #include "json.hpp"
 #include <iostream>
+#include <fstream>
 #include <thread>
 #include <string>
 #include <vector>
 #include <chrono>
 #include <ctime>
+#include <sstream>  // ✅ 解决 std::stringstream 错误
 #include <unordered_map>
 #include <functional>
+#include <muduo/net/TcpClient.h>
+#include <muduo/base/Logging.h>
 using namespace std;
 using json = nlohmann::json;
-
+using namespace muduo;
+using namespace muduo::net;
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -21,7 +26,7 @@ using json = nlohmann::json;
 #include "group.hpp"
 #include "user.hpp"
 #include "public.hpp"
-
+#include "base64.hpp" 
 // 记录当前系统登录的用户信息
 User g_currentUser;
 // 记录当前登录用户的好友列表信息
@@ -42,6 +47,13 @@ atomic_bool g_isLoginSuccess{false};
 void readTaskHandler(int clientfd);
 // 获取系统时间（聊天信息需要添加时间信息）
 string getCurrentTime();
+// 读取文件并转换为 Base64
+string fileToBase64(const string& filename);
+// 发送文件
+void sendfile(int clientfd, string str);
+void sendFile(int senderid, int receiverid, const string& filepath, TcpClient* client);
+// 处理文件接收并存储
+void handleFileTransfer(json &js);
 // 主聊天页面程序
 void mainMenu(int);
 // 显示当前登录成功用户的基本信息
@@ -145,15 +157,19 @@ int main(int argc, char **argv)
         {
             char name[50] = {0};
             char pwd[50] = {0};
+            char role[10] = {0};
             cout << "username:";
             cin.getline(name, 50);
             cout << "userpassword:";
             cin.getline(pwd, 50);
+            cout << "role (student / teacher / admin): ";
+            cin.getline(role, 10);
 
             json js;
             js["msgid"] = REG_MSG;
             js["name"] = name;
             js["password"] = pwd;
+            js["role"] = role; 
             string request = js.dump();
 
             int len = send(clientfd, request.c_str(), strlen(request.c_str()) + 1, 0);
@@ -299,6 +315,18 @@ void readTaskHandler(int clientfd)
         // 接收ChatServer转发的数据，反序列化生成json数据对象
         json js = json::parse(buffer);
         int msgtype = js["msgid"].get<int>();
+         // 处理文件传输
+        if (msgtype == MSG_FILE_TRANSFER)
+        {
+            handleFileTransfer(js);  // 解析和存储文件
+            continue;
+        }
+        // 处理文件传输确认消息
+        if (msgtype == ACK_FILE_TRANSFER)
+        {
+            cout << js["result"].get<string>() << endl;
+            continue;
+        }
         if (ONE_CHAT_MSG == msgtype)
         {
             cout << js["time"].get<string>() << " [" << js["id"] << "]" << js["name"].get<string>()
@@ -381,6 +409,7 @@ unordered_map<string, string> commandMap = {
     {"creategroup", "创建群组，格式creategroup:groupname:groupdesc"},
     {"addgroup", "加入群组，格式addgroup:groupid"},
     {"groupchat", "群聊，格式groupchat:groupid:message"},
+    {"sendfile", "发送文件，格式sendfile:friendid:filepath"}, 
     {"loginout", "注销，格式loginout"}};
 
 // 注册系统支持的客户端命令处理
@@ -391,6 +420,7 @@ unordered_map<string, function<void(int, string)>> commandHandlerMap = {
     {"creategroup", creategroup},
     {"addgroup", addgroup},
     {"groupchat", groupchat},
+    {"sendfile", sendfile},
     {"loginout", loginout}};
 
 // 主聊天页面程序
@@ -549,6 +579,7 @@ void groupchat(int clientfd, string str)
         cerr << "send groupchat msg error -> " << buffer << endl;
     }
 }
+
 // "loginout" command handler
 void loginout(int clientfd, string)
 {
@@ -579,3 +610,97 @@ string getCurrentTime()
             (int)ptm->tm_hour, (int)ptm->tm_min, (int)ptm->tm_sec);
     return std::string(date);
 }
+
+// 读取文件并编码为 Base64
+string fileToBase64(const string& filepath)
+{
+    ifstream infile(filepath, ios::binary);
+    if (!infile)
+    {
+        cerr << "Failed to open file: " << filepath << endl;
+        return "";
+    }
+
+    stringstream buffer;
+    buffer << infile.rdbuf();
+    string filedata = buffer.str();
+    infile.close();
+
+    // Base64 编码
+    return base64_encode(reinterpret_cast<const unsigned char*>(filedata.c_str()), filedata.size());
+}
+
+// 发送文件的函数
+void sendFile(int clientfd, int friendid, const string& filepath)
+{
+    // 提取文件名
+    string filename = filepath.substr(filepath.find_last_of("/\\") + 1);
+    // 将文件编码为 Base64
+    string encodedData = fileToBase64(filepath);
+
+    if (encodedData.empty())
+    {
+        cerr << "Failed to encode file: " << filepath << endl;
+        return;
+    }
+
+    // 组装 JSON 消息
+    json js;
+    js["msgid"] = MSG_FILE_TRANSFER;
+    js["id"] = g_currentUser.getId();  // 当前用户 ID
+    js["toid"] = friendid;
+    js["filename"] = filename;
+    js["filedata"] = encodedData;
+    string buffer = js.dump();
+
+    // 发送数据
+    int len = send(clientfd, buffer.c_str(), strlen(buffer.c_str()) + 1, 0);
+    if (-1 == len)
+    {
+        cerr << "send file msg error -> " << buffer << endl;
+    }
+    else
+    {
+        cout << "✅ File " << filename << " sent successfully to friend " << friendid << endl;
+    }
+}
+// "sendfile" command handler
+void sendfile(int clientfd, string str)
+{
+    int idx = str.find(":");
+    if (idx == -1)
+    {
+        cerr << "sendfile command format invalid!" << endl;
+        return;
+    }
+
+    int friendid = atoi(str.substr(0, idx).c_str());
+    string filepath = str.substr(idx + 1, str.size() - idx);
+
+    // 发送文件
+    sendFile(clientfd, friendid, filepath);
+}
+// 处理文件接收并存储
+void handleFileTransfer(json &js)
+{
+    string filename = js["filename"];
+    string filedata = js["filedata"];
+    string filepath = "./received_files/" + filename;
+
+    // 解码 Base64 数据
+    string decodedData = base64_decode(filedata);
+
+    // 将解码后的数据写入文件
+    ofstream outfile(filepath, ios::binary);
+    if (!outfile)
+    {
+        cerr << "❌ Failed to create file: " << filepath << endl;
+        return;
+    }
+
+    outfile.write(decodedData.c_str(), decodedData.size());
+    outfile.close();
+
+    cout << "✅ File received and saved to: " << filepath << endl;
+}
+

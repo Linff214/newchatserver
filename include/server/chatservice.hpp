@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <functional>
 #include <mutex>
+#include <mysql/mysql.h>
 using namespace std;
 using namespace muduo;
 using namespace muduo::net;
@@ -14,6 +15,8 @@ using namespace muduo::net;
 #include "friendmodel.hpp"
 #include "usermodel.hpp"
 #include "offlinemessagemodel.hpp"
+#include "assignmentmodel.hpp"
+#include "submissionmodel.hpp"
 #include "json.hpp"
 using json = nlohmann::json;
 
@@ -32,6 +35,10 @@ public:
     void reg(const TcpConnectionPtr &conn, json &js, Timestamp time);
     // 一对一聊天业务
     void oneChat(const TcpConnectionPtr &conn, json &js, Timestamp time);
+    // 教师发布作业
+    void publish_assignment(const TcpConnectionPtr& conn, json& js, Timestamp time);
+    //学生提交作业
+    void submit_assignment(const TcpConnectionPtr& conn, json& js, Timestamp time);
     // 添加好友业务
     void addFriend(const TcpConnectionPtr &conn, json &js, Timestamp time);
     // 创建群组业务
@@ -40,10 +47,14 @@ public:
     void addGroup(const TcpConnectionPtr &conn, json &js, Timestamp time);
     // 群组聊天业务
     void groupChat(const TcpConnectionPtr &conn, json &js, Timestamp time);
+    // 教务通知（系统广播）
+    void send_system_announcement(const TcpConnectionPtr& conn, json& js, Timestamp time);
     // 处理注销业务
     void loginout(const TcpConnectionPtr &conn, json &js, Timestamp time);
     // 处理客户端异常退出
     void clientCloseException(const TcpConnectionPtr &conn);
+    // 处理文件传输
+    void fileTransfer(const TcpConnectionPtr& conn, json& js, Timestamp time);
     // 服务器异常，业务重置方法
     void reset();
     // 获取消息对应的处理器
@@ -60,13 +71,15 @@ private:
     unordered_map<int, TcpConnectionPtr> _userConnMap;
     // 定义互斥锁，保证_userConnMap的线程安全
     mutex _connMutex;
-
+    MYSQL *_conn; 
     // 数据操作类对象
     UserModel _userModel;
     OfflineMsgModel _offlineMsgModel;
     FriendModel _friendModel;
     GroupModel _groupModel;
-
+    AssignmentModel _assignmentModel;
+    SubmissionModel _submissionModel;
+    
     // redis操作对象
     Redis _redis;
 };

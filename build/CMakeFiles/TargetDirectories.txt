@@ -1,0 +1,13 @@
+/home/ucore/Documents/chatserver/newchatserver/build/CMakeFiles/rebuild_cache.dir
+/home/ucore/Documents/chatserver/newchatserver/build/CMakeFiles/edit_cache.dir
+/home/ucore/Documents/chatserver/newchatserver/build/src/CMakeFiles/rebuild_cache.dir
+/home/ucore/Documents/chatserver/newchatserver/build/src/CMakeFiles/edit_cache.dir
+/home/ucore/Documents/chatserver/newchatserver/build/src/server/CMakeFiles/rebuild_cache.dir
+/home/ucore/Documents/chatserver/newchatserver/build/src/server/CMakeFiles/ChatServer.dir
+/home/ucore/Documents/chatserver/newchatserver/build/src/server/CMakeFiles/edit_cache.dir
+/home/ucore/Documents/chatserver/newchatserver/build/src/client/CMakeFiles/rebuild_cache.dir
+/home/ucore/Documents/chatserver/newchatserver/build/src/client/CMakeFiles/ChatClient.dir
+/home/ucore/Documents/chatserver/newchatserver/build/src/client/CMakeFiles/edit_cache.dir
+/home/ucore/Documents/chatserver/newchatserver/build/test/CMakeFiles/rebuild_cache.dir
+/home/ucore/Documents/chatserver/newchatserver/build/test/CMakeFiles/test_thread.dir
+/home/ucore/Documents/chatserver/newchatserver/build/test/CMakeFiles/edit_cache.dir

@@ -1,7 +1,8 @@
 #include "redis.hpp"
 #include <iostream>
 using namespace std;
-
+#include "json.hpp"
+using json = nlohmann::json;
 Redis::Redis()
     : _publish_context(nullptr), _subcribe_context(nullptr)
 {
@@ -61,6 +62,18 @@ bool Redis::publish(int channel, string message)
     freeReplyObject(reply);
     return true;
 }
+// 重载 publish 方法，支持字符串频道
+bool Redis::publish(std::string channel, std::string message)
+{
+    redisReply* reply = (redisReply*)redisCommand(_publish_context, "PUBLISH %s %s", channel.c_str(), message.c_str());
+    if (reply == nullptr)
+    {
+        cerr << "publish command failed!" << endl;
+        return false;
+    }
+    freeReplyObject(reply);
+    return true;
+}
 
 // 向redis指定的通道subscribe订阅消息
 bool Redis::subscribe(int channel)
@@ -85,6 +98,31 @@ bool Redis::subscribe(int channel)
     }
     // redisGetReply
 
+    return true;
+}
+bool Redis::subscribe(const string &channel)
+{
+    // SUBSCRIBE 命令：订阅指定字符串频道
+    // 这里只做订阅，不接收消息，接收消息在 observer_channel_message() 中处理
+    if (REDIS_ERR == redisAppendCommand(this->_subcribe_context, "SUBSCRIBE %s", channel.c_str()))
+    {
+        cerr << "subscribe to channel [" << channel << "] failed!" << endl;
+        return false;
+    }
+
+    // redisBufferWrite 可以循环发送缓冲区，直到缓冲区数据发送完毕
+    int done = 0;
+    while (!done)
+    {
+        if (REDIS_ERR == redisBufferWrite(this->_subcribe_context, &done))
+        {
+            cerr << "subscribe to channel [" << channel << "] failed during buffer write!" << endl;
+            return false;
+        }
+    }
+
+    // 这里不调用 redisGetReply()，因为真正的消息处理在 `observer_channel_message()` 中进行
+    cout << "Subscribed to channel [" << channel << "] successfully!" << endl;
     return true;
 }
 
@@ -116,17 +154,44 @@ void Redis::observer_channel_message()
     while (REDIS_OK == redisGetReply(this->_subcribe_context, (void **)&reply))
     {
         // 订阅收到的消息是一个带三元素的数组
-        if (reply != nullptr && reply->element[2] != nullptr && reply->element[2]->str != nullptr)
-        {
-            // 给业务层上报通道上发生的消息
-            _notify_message_handler(atoi(reply->element[1]->str) , reply->element[2]->str);
-        }
+        if (reply != nullptr && reply->type == REDIS_REPLY_ARRAY && reply->elements >= 3 &&
+            reply->element[2] != nullptr && reply->element[2]->str != nullptr)
+            {
+                cout << ">>> Received message from channel [" << reply->element[1]->str << "]: " 
+                     << reply->element[2]->str << endl;
+    
+                // 尝试解析 JSON 并调用回调
+                try
+                {
+                    string channel(reply->element[1]->str);
+                    string message(reply->element[2]->str);
+    
+                    // 检查频道是否是 system_broadcast
+                    if (channel == "system_broadcast")
+                    {
+                        cout << ">>> Forwarding broadcast message to handler..." << endl;
+                        _notify_message_handler(0, message);  // 使用 0 作为 system_broadcast 的标识
+                    }
+                    else
+                    {
+                        // 处理其他 channel 时转换为 int
+                        int userid = atoi(channel.c_str());
+                        cout << ">>> Forwarding message to user [" << userid << "]" << endl;
+                        _notify_message_handler(userid, message);
+                    }
 
-        freeReplyObject(reply);
+                }
+                catch (const exception &e)
+                {
+                    cerr << "Error parsing message: " << e.what() << endl;
+                }
+            }
+            freeReplyObject(reply);
+        }
+    
+        cerr << ">>>>>>>>>>>>> observer_channel_message quit <<<<<<<<<<<<<" << endl;
     }
 
-    cerr << ">>>>>>>>>>>>> observer_channel_message quit <<<<<<<<<<<<<" << endl;
-}
 
 void Redis::init_notify_handler(function<void(int,string)> fn)
 {

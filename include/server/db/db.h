@@ -13,6 +13,10 @@ public:
     MySQL();
     // 释放数据库连接资源
     ~MySQL();
+    // 设置数据库名（动态修改）
+    void setDatabase(std::string new_dbname);
+    // 获取当前数据库名
+    string getDatabase();
     // 连接数据库
     bool connect();
     // 更新操作

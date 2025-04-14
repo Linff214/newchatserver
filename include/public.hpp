@@ -17,6 +17,23 @@ enum EnMsgType
     CREATE_GROUP_MSG, // 创建群组
     ADD_GROUP_MSG, // 加入群组
     GROUP_CHAT_MSG, // 群聊天
+
+    ASSIGNMENT_PUBLISH_MSG,   // 发布作业
+    ASSIGNMENT_SUBMIT_MSG,   // 提交作业
+    ASSIGNMENT_QUERY_MSG,    // 查询作业列表
+    SYSTEM_BROADCAST_MSG,   //系统公告
+    //FILE_TRANSFER_MSG,  // 发送文件
+    //FILE_RECEIVE_MSG,    // 接收文件
+    MSG_FILE_TRANSFER, // ✅ 文件传输消息
+    ACK_FILE_TRANSFER,
+};
+// 文件传输结构
+struct FileTransfer
+{
+    int senderid;          // 发送者 ID
+    int receiverid;        // 接收者 ID
+    std::string filename;  // 文件名
+    std::string filedata;  // Base64 编码后的文件数据
 };
 
 #endif

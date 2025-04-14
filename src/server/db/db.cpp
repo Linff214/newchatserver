@@ -1,11 +1,12 @@
 #include "db.h"
 #include <muduo/base/Logging.h>
+#include <iostream>
 
 // 数据库配置信息
 static string server = "127.0.0.1";
 static string user = "root";
 static string password = "214911_lXX";
-static string dbname = "chat";
+static string dbname = "newchat";
 
 // 初始化数据库连接
 MySQL::MySQL()
@@ -29,7 +30,7 @@ bool MySQL::connect()
     {
         // C和C++代码默认的编码字符是ASCII，如果不设置，从MySQL上拉下来的中文显示？
         mysql_query(_conn, "set names gbk");
-        LOG_INFO << "connect mysql success!";
+        LOG_INFO << "connect mysql success with database: " << dbname;
     }
     else
     {
@@ -39,6 +40,19 @@ bool MySQL::connect()
     return p;
 }
 
+
+// 设置数据库名（动态修改）
+void MySQL::setDatabase(std::string new_dbname)
+{
+    dbname = new_dbname;
+}
+
+// 获取当前数据库名
+std::string MySQL::getDatabase()
+{
+    return dbname;
+}
+
 // 更新操作
 bool MySQL::update(string sql)
 {
@@ -46,6 +60,7 @@ bool MySQL::update(string sql)
     {
         LOG_INFO << __FILE__ << ":" << __LINE__ << ":"
                  << sql << "更新失败!";
+        std::cerr << mysql_error(_conn) << endl; 
         return false;
     }
 

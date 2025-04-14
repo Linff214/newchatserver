@@ -1,0 +1,1 @@
+/usr/bin/c++  -g  -rdynamic CMakeFiles/test_thread.dir/test_thread.cpp.o CMakeFiles/test_thread.dir/__/src/client/chatclient.cpp.o  -o ../../bin/test_thread  -L/usr/lib64/mysql -Wl,-rpath,/usr/lib64/mysql -lpthread -lmuduo_net -lmuduo_base 
